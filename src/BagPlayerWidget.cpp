@@ -108,14 +108,14 @@ void BagPlayerWidget::handleLoadClicked(void)
             Q_EMIT sendLoadBag(filename.absoluteFilePath());
 
         } catch (const rosbag::BagException& e) {
-            ROS_ERROR(e.what());
+            ROS_ERROR_STREAM(e.what());
 
             receiveStatusText(QString::fromStdString(e.what()));
             receiveEnableActionButtons(false);
         }
     } else {
         std::string msg = "File: '" + filename.absoluteFilePath().toStdString() + "' does not exists!";
-        ROS_WARN(msg.c_str());
+        ROS_WARN_STREAM(msg);
     }
 }
 

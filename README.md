@@ -49,7 +49,7 @@ sudo apt install clang-format-16
 
 1. Clone this repository into your ROS workspace and compile it using cmake:
     ```
-    mkdir -p ros_ws/src && ros_ws/src && git clone https://github.com/fada-catec/rosbag-rviz-panel
+    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag-rviz-panel
 
     cd .. && catkin_make -DCMAKE_BUILD_TYPE=Release
     ```
