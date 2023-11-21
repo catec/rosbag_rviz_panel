@@ -33,7 +33,7 @@ sudo apt-get install build-essential cmake
 sudo apt-get install qt5-default
 ```
 
-### ROS(Robot Operative System)
+### ROS (Robot Operative System)
 
 Follow up your ROS distro installation guide: [Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu) or [Noetic](http://wiki.ros.org/noetic/Installation/Ubuntu)
 
@@ -72,6 +72,8 @@ sudo apt install clang-format-16
 ## Help / Contribution
 
 * Contact: **José Manuel González Marín** (jmgonzalez@catec.aero)
+
+![FADA](./docs/FADA.png)
 
 ![CATEC](./docs/CATEC-ATLAS.png)
 
