@@ -1,10 +1,10 @@
 <library path="librosbag_rviz_panel">
 
-<class name="rosbag_rviz_panel/RosbagRvizPlayer"
+<class name="rosbag_rviz_panel/RosbagPlayer"
        type="rosbag_rviz_panel::RosbagRvizPanel"
        base_class_type="rviz::Panel">
   <description>
-    This tool lets you reproduce and visualize rosbags.
+    This tool lets you reproduce and visualise rosbags.
   </description>
 </class>
 
