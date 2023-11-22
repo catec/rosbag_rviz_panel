@@ -4,7 +4,7 @@
 
 This package provides a custom RViz panel for playing rosbags with enhanced functionalities. The panel allows users to play rosbags forwards or backwards, adjust play speeds, while also displaying some relevant information such the date of the messages or the total size of the bag. Additionally, it features a custom progress bar that users can interact with.
 
-![Alt Text](docs/rviz_view.png)
+![Alt Text](docs/rviz_view.gif)
 
 ## Features
 
@@ -17,7 +17,6 @@ This package provides a custom RViz panel for playing rosbags with enhanced func
   - Playback speed.
   - Total size of the bag.
 - **Interactive Progress Bar:** Users can interact with the custom progress bar to navigate within the rosbag.
-
 
 ## Dependencies installation
 
@@ -49,7 +48,7 @@ sudo apt install clang-format-16
 
 1. Clone this repository into your ROS workspace and compile it using cmake:
     ```
-    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag-rviz-panel
+    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag_rviz_panel
 
     cd .. && catkin_make -DCMAKE_BUILD_TYPE=Release
     ```
@@ -73,10 +72,13 @@ sudo apt install clang-format-16
 
 * Contact: **José Manuel González Marín** (jmgonzalez@catec.aero)
 
-![FADA](./docs/FADA.png)
-
 ![CATEC](./docs/CATEC-ATLAS.png)
 
 * Found a bug? Create an ISSUE!
 
 * Do you want to contribute? Create a PULL-REQUEST!
+
+---
+---
+
+![MEME](./docs/meme.gif)

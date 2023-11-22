@@ -23,6 +23,7 @@ BagPlayerWidget::BagPlayerWidget(QWidget* parent) : QWidget(parent), _ui(std::ma
     _progress_bar->setEnabled(false);
     _ui->horizontalLayout_2->addWidget(_progress_bar.get());
 
+    QIcon::setThemeName("Yaru");
     _ui->play_button->setIcon(QIcon::fromTheme("media-playback-start"));
     _ui->begin_button->setIcon(QIcon::fromTheme("media-skip-backward"));
     _ui->end_button->setIcon(QIcon::fromTheme("media-skip-forward"));
