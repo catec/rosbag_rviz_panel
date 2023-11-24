@@ -89,6 +89,21 @@ target_compile_options(${PROJECT_NAME} PUBLIC "-Wno-register") # Avoid OGRE depr
 
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  PATTERN ".svn" EXCLUDE
+)
+
+INSTALL(FILES rosbag_rviz_panel_description.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
 #########################
 ## Print configuration ##
 #########################
