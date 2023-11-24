@@ -12,20 +12,23 @@
    <buildtool_depend>catkin</buildtool_depend>
 
    <build_depend>roscpp</build_depend>
+   <build_depend>pluginlib</build_depend>
+   <build_depend>rviz</build_depend>
+   <build_depend>rosbag</build_depend>
+   <build_depend>qtbase5-dev</build_depend>
+
    <build_export_depend>roscpp</build_export_depend>
+   <build_export_depend>pluginlib</build_export_depend>
+   <build_export_depend>rviz</build_export_depend>
+   <build_export_depend>rosbag</build_export_depend>
+   <build_export_depend>qtbase5-dev</build_export_depend>
+
    <exec_depend>roscpp</exec_depend>
+   <exec_depend>pluginlib</exec_depend>
+   <exec_depend>rviz</exec_depend>
+   <exec_depend>rosbag</exec_depend>
+   <exec_depend>qtbase5-dev</exec_depend>
 
-  <build_depend>pluginlib</build_depend>
-  <build_export_depend>pluginlib</build_export_depend>
-  <exec_depend>pluginlib</exec_depend>
-
-  <build_depend>rviz</build_depend>
-  <build_export_depend>rviz</build_export_depend>
-  <exec_depend>rviz</exec_depend>
-
-  <build_depend>rosbag</build_depend>
-  <build_export_depend>rosbag</build_export_depend>
-  <exec_depend>rosbag</exec_depend>
 
   <export>
       <rviz plugin="${prefix}/rosbag_rviz_panel_description.xml"/>

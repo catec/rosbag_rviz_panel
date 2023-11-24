@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QsLog/QsLog.h>
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>

@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(rosbag_rviz_panel DESCRIPTION "Interactive rosbag player - RViz Panel"
-                            LANGUAGES   CXX C
-)
+set(ENV{CC} /usr/bin/gcc)
+set(ENV{CXX} /usr/bin/g++)
+
+project(rosbag_rviz_panel DESCRIPTION "Interactive rosbag player - RViz Panel" LANGUAGES CXX C)
 
 #####################
 ## Project Options ##
