@@ -55,7 +55,7 @@ class QBagPlayer : public QObject
 
   private:
     /**
-     * @brief Main loop to play rosbags, forward or backwards.
+     * @brief Main loop to play rosbags, forwards or backwards.
      */
     void run(void);
 
@@ -82,10 +82,11 @@ class QBagPlayer : public QObject
      * @brief Calculate the time stamp to send ROS to sleep
      * until that stamp has been reached.
      *
-     * @param msg_time rclcpp::Time with the last proccessed
-     *        message time stamp.
+     * @param msg_time rcutils_time_point_value_t with the
+     *        last proccessed message time stamp.
      *
-     * @return rclcpp::Time with the time stam to sleep until.
+     * @return std::chrono::_V2::system_clock::time_point
+     *         with the time stam to sleep until.
      */
     std::chrono::_V2::system_clock::time_point realTimeDuration(const rcutils_time_point_value_t& msg_time);
 
@@ -95,7 +96,8 @@ class QBagPlayer : public QObject
      *
      * @param progress Int value of the progress bar [0, 100]
      *
-     * @return rclcpp::Time with the calculated time stamp.
+     * @return std::chrono::nanoseconds with the calculated
+     *         time stamp.
      */
     std::chrono::nanoseconds getProgressTime(const int progress);
 
@@ -241,8 +243,11 @@ class QBagPlayer : public QObject
   private:
     std::shared_ptr<rclcpp::Node>                                      _nh;
     std::shared_ptr<rcpputils::SharedLibrary>                          _library_generic_publisher;
-    std::shared_ptr<rosbag2_cpp::readers::SequentialReader>            _reader;
+    std::unique_ptr<rosbag2_cpp::readers::SequentialReader>            _reader;
     std::unordered_map<std::string, std::shared_ptr<GenericPublisher>> _pubs;
+
+    rosbag2_cpp::StorageOptions   _storage_options;
+    rosbag2_cpp::ConverterOptions _converter_options;
 
     std::thread                                        _play_thread;
     std::chrono::time_point<std::chrono::system_clock> _play_start;

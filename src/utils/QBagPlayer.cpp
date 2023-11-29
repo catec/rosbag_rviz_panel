@@ -41,7 +41,12 @@ namespace rosbag_rviz_panel {
 
 QBagPlayer::QBagPlayer(QObject* parent) : QObject(parent)
 {
-    _nh = std::make_shared<rclcpp::Node>("QBagPlayer_node");
+    _nh     = std::make_shared<rclcpp::Node>("QBagPlayer_node");
+    _reader = std::make_unique<rosbag2_cpp::readers::SequentialReader>();
+
+    _storage_options.storage_id                    = "sqlite3";
+    _converter_options.input_serialization_format  = "cdr";
+    _converter_options.output_serialization_format = "cdr";
 }
 
 QBagPlayer::~QBagPlayer()
@@ -62,16 +67,9 @@ void QBagPlayer::receiveLoadBag(const QString filename)
     Q_EMIT sendStatusText(loading_msg);
 
     try {
-        rosbag2_cpp::StorageOptions storage_options;
-        storage_options.uri        = filename.toStdString();
-        storage_options.storage_id = "sqlite3";
-        rosbag2_cpp::ConverterOptions converter_options;
-        converter_options.input_serialization_format  = "cdr";
-        converter_options.output_serialization_format = "cdr";
+        _storage_options.uri = filename.toStdString();
 
-        _reader.reset();
-        _reader = std::make_shared<rosbag2_cpp::readers::SequentialReader>();
-        _reader->open(storage_options, converter_options);
+        _reader->open(_storage_options, _converter_options);
     } catch (const std::exception& r) {
         RCLCPP_ERROR_STREAM(_nh->get_logger(), r.what());
         Q_EMIT sendStatusText(QString::fromStdString(r.what()));
@@ -208,6 +206,9 @@ void QBagPlayer::receiveSetPause(void)
 
     if (_play_thread.joinable()) {
         _play_thread.join();
+
+        if (!_storage_options.uri.empty())
+            _reader->open(_storage_options, _converter_options);
     }
 }
 

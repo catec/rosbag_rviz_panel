@@ -29,7 +29,7 @@ sudo apt install clang-format-16
 
 1. Clone this repository into your ROS workspace and compile it using cmake:
     ```
-    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag_rviz_panel/tree/foxy
+    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone -b foxy https://github.com/fada-catec/rosbag_rviz_panel.git
 
     cd .. && colcon build --packages-select rosbag_rviz_panel
     ```
