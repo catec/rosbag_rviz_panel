@@ -1,37 +1,27 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
+  <name>rosbag_rviz_panel</name>
+  <version>1.0.0</version>
+  <description>Play and visualise rosbags in rviz2</description>
+  <maintainer email="jmgonzalez@catec.aero">Jose Manuel Gonzalez Marin</maintainer>
+  <license>MIT</license>
 
-   <name>rosbag_rviz_panel</name>
-   <version>0.1.9</version>
-   <description>The rosbag_rviz_panel package</description>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>qtbase5-dev</build_depend>
 
-   <maintainer email="jmgonzalez@catec.aero">José Manuel González Marín</maintainer>
+  <exec_depend>libqt5-core</exec_depend>
+  <exec_depend>libqt5-gui</exec_depend>
+  <exec_depend>libqt5-opengl</exec_depend>
+  <exec_depend>libqt5-widgets</exec_depend>
 
-   <license>MIT</license>
-
-   <buildtool_depend>catkin</buildtool_depend>
-
-   <build_depend>roscpp</build_depend>
-   <build_depend>pluginlib</build_depend>
-   <build_depend>rviz</build_depend>
-   <build_depend>rosbag</build_depend>
-   <build_depend>qtbase5-dev</build_depend>
-
-   <build_export_depend>roscpp</build_export_depend>
-   <build_export_depend>pluginlib</build_export_depend>
-   <build_export_depend>rviz</build_export_depend>
-   <build_export_depend>rosbag</build_export_depend>
-   <build_export_depend>qtbase5-dev</build_export_depend>
-
-   <exec_depend>roscpp</exec_depend>
-   <exec_depend>pluginlib</exec_depend>
-   <exec_depend>rviz</exec_depend>
-   <exec_depend>rosbag</exec_depend>
-   <exec_depend>qtbase5-dev</exec_depend>
-
+  <depend>pluginlib</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>rclcpp</depend>
+  <depend>rcpputils</depend>
+  <depend>rcutils</depend>
+  <depend>rviz_common</depend>
 
   <export>
-      <rviz plugin="${prefix}/rosbag_rviz_panel_description.xml"/>
+    <build_type>ament_cmake</build_type>
   </export>
-
 </package>

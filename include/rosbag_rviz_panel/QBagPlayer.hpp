@@ -1,15 +1,33 @@
 #pragma once
 
-#include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-
 #include <QObject>
 #include <QString>
+#include <chrono>
+#include <memory>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
+#include <rcpputils/shared_library.hpp>
+#include <rosbag2_cpp/converter_options.hpp>
+#include <rosbag2_cpp/readers/sequential_reader.hpp>
+#include <rosbag2_cpp/storage_options.hpp>
+#include <string>
 #include <thread>
 
 namespace rosbag_rviz_panel {
+
+class GenericPublisher : public rclcpp::PublisherBase
+{
+  public:
+    GenericPublisher(
+            rclcpp::node_interfaces::NodeBaseInterface* node_base,
+            const rosidl_message_type_support_t&        type_support,
+            const std::string&                          topic_name,
+            const rclcpp::QoS&                          qos);
+
+    virtual ~GenericPublisher() = default;
+
+    void publish(std::shared_ptr<rmw_serialized_message_t> message);
+};
 
 /**
  * @brief QBagPlayer.
@@ -18,7 +36,7 @@ namespace rosbag_rviz_panel {
  * backwards, at different speed rates.
  *
  */
-class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
+class QBagPlayer : public QObject
 {
     Q_OBJECT
 
@@ -40,34 +58,6 @@ class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
      * @brief Main loop to play rosbags, forward or backwards.
      */
     void run(void);
-
-    /**
-     * @brief Create a ros::AdvertiseOptions object to create
-     * a publisher for the given topic.
-     *
-     * @param c rosbag::ConnectionInfo to check if the topic is
-     *          latching its messages.
-     * @param queue_size uint32_t with the size of the queue for
-     *        the ros publisher.
-     * @param prefix std::string with an optional prefix for the
-     *        topic to publish to.
-     *
-     * @return ros::AdvertiseOptions with all the given info.
-     */
-    ros::AdvertiseOptions createAdvertiseOptions(
-            const rosbag::ConnectionInfo* c,
-            uint32_t                      queue_size,
-            const std::string&            prefix);
-
-    /**
-     * @brief Checks if latch was true or false for a topic.
-     *
-     * @param c rosbag::ConnectionInfo to check if the topic is
-     *          latching its messages.
-     *
-     * @return bool with the value of the latching option.
-     */
-    bool isLatching(const rosbag::ConnectionInfo* c);
 
     /**
      * @brief Converts the size of a rosbag into
@@ -92,12 +82,12 @@ class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
      * @brief Calculate the time stamp to send ROS to sleep
      * until that stamp has been reached.
      *
-     * @param msg_time ros::Time with the last proccessed
+     * @param msg_time rclcpp::Time with the last proccessed
      *        message time stamp.
      *
-     * @return ros::Time with the time stam to sleep until.
+     * @return rclcpp::Time with the time stam to sleep until.
      */
-    ros::Time real_time(const ros::Time& msg_time);
+    std::chrono::_V2::system_clock::time_point realTimeDuration(const rcutils_time_point_value_t& msg_time);
 
     /**
      * @brief Calculate the time stamp to start playing from
@@ -105,9 +95,14 @@ class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
      *
      * @param progress Int value of the progress bar [0, 100]
      *
-     * @return ros::Time with the calculated time stamp.
+     * @return rclcpp::Time with the calculated time stamp.
      */
-    ros::Time getProgressTime(const int progress);
+    std::chrono::nanoseconds getProgressTime(const int progress);
+
+    std::shared_ptr<GenericPublisher> createGenericPublisher(
+            const std::string& topic,
+            const std::string& type,
+            const rclcpp::QoS& qos);
 
   Q_SIGNALS:
     /**
@@ -190,17 +185,17 @@ class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
      * @brief Q_SLOT to set the time stamp for the beginning of
      *        the bag.
      *
-     * @param start ros::Time with the desired time stamp.
+     * @param start rclcpp::Time with the desired time stamp.
      */
-    void receiveSetStart(const ros::Time& start);
+    void receiveSetStart(const double start);
 
     /**
      * @brief Q_SLOT to set the time stamp for the end of
      *        the bag.
      *
-     * @param end ros::Time with the desired time stamp.
+     * @param end rclcpp::Time with the desired time stamp.
      */
-    void receiveSetEnd(const ros::Time& end);
+    void receiveSetEnd(const double end);
 
     /**
      * @brief Q_SLOT to change the playback speed.
@@ -244,19 +239,18 @@ class ROSBAG_STORAGE_DECL QBagPlayer : public QObject
     void receiveClickedProgress(int value);
 
   private:
-    ros::NodeHandle               _nh;
-    rosbag::Bag                   _bag;
-    std::unique_ptr<rosbag::View> _full_view;
+    std::shared_ptr<rclcpp::Node>                                      _nh;
+    std::shared_ptr<rcpputils::SharedLibrary>                          _library_generic_publisher;
+    std::shared_ptr<rosbag2_cpp::readers::SequentialReader>            _reader;
+    std::unordered_map<std::string, std::shared_ptr<GenericPublisher>> _pubs;
 
-    std::map<std::string, ros::Publisher> _pubs;
-    std::vector<rosbag::View::iterator>   _reverse_bag;
-    std::thread                           _play_thread;
+    std::thread                                        _play_thread;
+    std::chrono::time_point<std::chrono::system_clock> _play_start;
 
-    ros::Time _bag_control_start;
-    ros::Time _bag_control_end;
-    ros::Time _full_bag_start, _full_bag_end;
-    ros::Time _last_message_time;
-    ros::Time _play_start;
+    std::chrono::nanoseconds _bag_control_start;
+    std::chrono::nanoseconds _bag_control_end;
+    std::chrono::nanoseconds _full_bag_start, _full_bag_end;
+    std::chrono::nanoseconds _last_message_time;
 
     double _playback_speed{1.0};
     bool   _pause{false};

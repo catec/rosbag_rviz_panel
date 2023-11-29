@@ -1,0 +1,8 @@
+<library path="rosbag_rviz_panel">
+
+  <class name="rosbag_rviz_panel/RosbagRvizPlayer"
+         type="rosbag_rviz_panel::RosbagRvizPanel"
+         base_class_type="rviz_common::Panel">
+    <description>The RosbagRvizPlayer panel</description>
+  </class>
+</library>

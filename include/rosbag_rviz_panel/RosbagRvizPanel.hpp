@@ -1,7 +1,7 @@
 #pragma once
 
-#include <ros/ros.h>
-#include <rviz/panel.h>
+#include <memory>
+#include <rviz_common/panel.hpp>
 
 namespace rosbag_rviz_panel {
 
@@ -10,11 +10,10 @@ class BagPlayerWidget;
 /**
  * @brief RosbagRvizPanel.
  *
- * This custom rviz::Panel implements all necessary
+ * This custom rviz_common::Panel implements all necessary
  * functions to work as an independent rviz plugin.
- *
  */
-class RosbagRvizPanel : public rviz::Panel
+class RosbagRvizPanel : public rviz_common::Panel
 {
     Q_OBJECT
 
@@ -34,26 +33,26 @@ class RosbagRvizPanel : public rviz::Panel
     /**
      * @brief Load a rviz configuration.
      *
-     * @param config rviz::Config with the configuration
+     * @param config rviz_common::Config with the configuration
      *               to load from.
      */
-    virtual void load(const rviz::Config& config);
+    void load(const rviz_common::Config& config);
 
     /**
      * @brief Save the actual rviz configuration.
      *
-     * @param config rviz::Config to save.
+     * @param config rviz_common::Config to save.
      */
-    virtual void save(rviz::Config config) const;
+    void save(rviz_common::Config config) const;
 
-  private:
+  protected:
     /**
      * @brief Sets up the main panel with the widget
      * object.
      */
     void setupPanelLayout();
 
-  protected:
+  private:
     std::unique_ptr<BagPlayerWidget> _widget;
 };
 } // namespace rosbag_rviz_panel

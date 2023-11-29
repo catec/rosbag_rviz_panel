@@ -1,124 +1,111 @@
-cmake_minimum_required(VERSION 3.10)
-set(ENV{CC} /usr/bin/gcc)
-set(ENV{CXX} /usr/bin/g++)
+cmake_minimum_required(VERSION 3.5)
+project(rosbag_rviz_panel)
 
-project(rosbag_rviz_panel DESCRIPTION "Interactive rosbag player - RViz Panel" LANGUAGES CXX C)
-
-#####################
-## Project Options ##
-#####################
-
-## Force some variables that could be defined in the command line to be written to cache
-option(WARNINGS_ARE_ERRORS "Treat warnings as errors"                                  OFF)
-option(WARNINGS_ANSI_ISO   "Issue all the mandatory diagnostics listed in C standard"  ON)
-option(WARNINGS_EFFCPP     "Issue all the warnings listed in the book of Scot Meyers"  OFF)
-
-if(${WARNINGS_ANSI_ISO})
-   add_compile_options(-Wcast-align)
-   add_compile_options(-Wpedantic)
-   add_compile_options(-Wextra)
-else()
-   add_compile_options(-Wno-narrowing)
-   add_compile_options(-Wno-delete-non-virtual-dtor)
-   add_compile_options(-Wno-unnamed-type-template-args)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
 endif()
 
-if(${WARNINGS_ARE_ERRORS})
-   add_compile_options(-Werror)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual)
 endif()
 
-if(${WARNINGS_EFFCPP})
-   add_compile_options(-Weffc++)
-endif()
+add_definitions(-D_BUILD_DIR_PATH="${CMAKE_CURRENT_BINARY_DIR}")
+add_definitions(-D_SRC_DIR_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
 
-set(CMAKE_CXX_STANDARD 17)
-add_compile_options(-Wall -Wextra)
+find_package(ament_cmake REQUIRED)
 
-IF(NOT DEFINED CMAKE_PREFIX_PATH)
-   IF(NOT "$ENV{CMAKE_PREFIX_PATH}" STREQUAL "")
-      IF(NOT WIN32)
-        STRING(REPLACE ":" ";" CMAKE_PREFIX_PATH $ENV{CMAKE_PREFIX_PATH})
-      ELSE()
-        SET(CMAKE_PREFIX_PATH $ENV{CMAKE_PREFIX_PATH})
-      ENDIF()
-   ENDIF()
-ENDIF()
-   
-SET(CMAKE_INCLUDE_CURRENT_DIR ON)
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_INSTALL_PREFIX}/lib/cmake/)
-   
-MESSAGE(STATUS "Using CMAKE_PREFIX_PATH - ${CMAKE_PREFIX_PATH}")
+find_package(rviz_common REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Test)
+find_package(pluginlib REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rcpputils REQUIRED)
+find_package(rcutils REQUIRED)
 
-#######################
-## Configuring ROS   ##
-#######################
-find_package(catkin REQUIRED 
-                    COMPONENTS roscpp pluginlib rviz rosbag)
-  
-catkin_package(
-   INCLUDE_DIRS   include
-   LIBRARIES      ${PROJECT_NAME}
-   CATKIN_DEPENDS roscpp pluginlib rviz rosbag
-   DEPENDS        
+set(${PROJECT_NAME}_HDRS
+  include/${PROJECT_NAME}/BagPlayerWidget.hpp
+  include/${PROJECT_NAME}/QBagPlayer.hpp
+  include/${PROJECT_NAME}/QCustomProgressBar.hpp
+  include/${PROJECT_NAME}/RosbagRvizPanel.hpp
 )
 
-#######################
-## Configuring Qt5   ##
-#######################
-find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
-set(CMAKE_AUTOMOC ON)
-add_definitions(-DQT_NO_KEYWORDS)
+foreach(header "${${PROJECT_NAME}_HDRS}")
+  qt5_wrap_cpp(${PROJECT_NAME}_MOCS ${header})
+endforeach()
 
-#####################################
-##        Create library           ##
-#####################################
-file(GLOB_RECURSE SRCS "src/*.cpp")
-file(GLOB_RECURSE HDRS "include/*.h")
+set(${PROJECT_NAME}_UIS
+  src/BagPlayerWidget.ui
+)
 
-file(GLOB_RECURSE UIS   "src/*.ui")
-QT5_WRAP_UI(UIS_H ${UIS})
+qt5_wrap_ui(${PROJECT_NAME}_UIS_H ${${PROJECT_NAME}_UIS})
 
-add_library(${PROJECT_NAME} SHARED ${SRCS} ${HDRS} ${UIS_H})
+set(${PROJECT_NAME}_SRCS
+  src/RosbagRvizPanel.cpp
+  src/BagPlayerWidget.cpp
+  src/utils/QBagPlayer.cpp
+  src/utils/QCustomProgressBar.cpp
+)
+
+add_library(${PROJECT_NAME} SHARED
+  ${${PROJECT_NAME}_SRCS}
+  ${${PROJECT_NAME}_UIS_H}
+  ${${PROJECT_NAME}_MOCS}
+)
+
 target_include_directories(${PROJECT_NAME} PUBLIC
-   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-   $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  ${Qt5Widgets_INCLUDE_DIRS}
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${catkin_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${catkin_LIBRARIES} Qt5::Widgets)
-target_compile_options(${PROJECT_NAME} PUBLIC "-Wno-register") # Avoid OGRE deprecaton warnings under C++17
-
-add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
-
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  Qt5::Widgets
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  PATTERN ".svn" EXCLUDE
+# Causes the visibility macros to use dllexport rather than dllimport,
+# which is appropriate when building the dll but not consuming it.
+target_compile_definitions(rosbag_rviz_panel PRIVATE "RVIZ_DEFAULT_PLUGINS_BUILDING_LIBRARY")
+
+# prevent pluginlib from using boost
+target_compile_definitions(rosbag_rviz_panel PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
+pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)
+
+ament_target_dependencies(${PROJECT_NAME}
+  PUBLIC
+  rclcpp
+  rviz_common
+  rosbag2_cpp
+  rcpputils
+  rcutils
 )
 
-INSTALL(FILES rosbag_rviz_panel_description.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+ament_export_include_directories(include)
+ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  rviz_common
+  rclcpp
+  rosbag2_cpp
+  rcpputils
+  rcutils
 )
 
-#########################
-## Print configuration ##
-#########################
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
 
-message(STATUS)
-message(STATUS "------------ General configuration for - ${PROJECT_NAME} ------------")
-message(STATUS)
-message(STATUS "WARNINGS_ANSI_ISO   = ${WARNINGS_ANSI_ISO}")
-message(STATUS "WARNINGS_ARE_ERRORS = ${WARNINGS_ARE_ERRORS}")
-message(STATUS "WARNINGS_EFFCPP     = ${WARNINGS_EFFCPP}")
-message(STATUS)
-message(STATUS "BUILD_SHARED_LIBS   = ${BUILD_SHARED_LIBS}")
-message(STATUS)
-message(STATUS "-------------------------- Dependencies --------------------------")
-message(STATUS)
-message(STATUS "Change a value with: cmake -D<Variable>=<Value>")
-message(STATUS)
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+ament_export_libraries(${PROJECT_NAME})
+
+ament_package()

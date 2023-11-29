@@ -1,23 +1,52 @@
-#include "rosbag_rviz_panel/QBagPlayer.h"
+#include "rosbag_rviz_panel/QBagPlayer.hpp"
+
+#include <rcutils/time.h>
 
 #include <QDateTime>
+#include <rosbag2_cpp/typesupport_helpers.hpp>
 
 #define MAX_PLAYBACK_SPEED 10.0
-#define MIN_PLAYBACK_SPEED -10.0
+#define MIN_PLAYBACK_SPEED 0.5
+
+namespace {
+rcl_publisher_options_t rosbag2_get_publisher_options(const rclcpp::QoS& qos)
+{
+    auto options = rcl_publisher_get_default_options();
+    options.qos  = qos.get_rmw_qos_profile();
+    return options;
+}
+} // unnamed namespace
 
 namespace rosbag_rviz_panel {
 
-QBagPlayer::QBagPlayer(QObject* parent) : QObject(parent), _nh("~")
+GenericPublisher::GenericPublisher(
+        rclcpp::node_interfaces::NodeBaseInterface* node_base,
+        const rosidl_message_type_support_t&        type_support,
+        const std::string&                          topic_name,
+        const rclcpp::QoS&                          qos) :
+        rclcpp::PublisherBase(node_base, topic_name, type_support, rosbag2_get_publisher_options(qos))
+{}
+
+void GenericPublisher::publish(std::shared_ptr<rmw_serialized_message_t> message)
 {
-    ros::Time::init();
+    auto return_code = rcl_publish_serialized_message(this->get_publisher_handle().get(), message.get(), NULL);
+
+    if (return_code != RCL_RET_OK) {
+        rclcpp::exceptions::throw_from_rcl_error(return_code, "failed to publish serialized message");
+    }
+}
+} // namespace rosbag_rviz_panel
+
+namespace rosbag_rviz_panel {
+
+QBagPlayer::QBagPlayer(QObject* parent) : QObject(parent)
+{
+    _nh = std::make_shared<rclcpp::Node>("QBagPlayer_node");
 }
 
 QBagPlayer::~QBagPlayer()
 {
     receiveSetPause();
-
-    if (_bag.isOpen())
-        _bag.close();
 }
 
 void QBagPlayer::receiveLoadBag(const QString filename)
@@ -25,52 +54,53 @@ void QBagPlayer::receiveLoadBag(const QString filename)
     receiveSetPause();
     resetTxt();
 
-    if (!_reverse_bag.empty())
-        _reverse_bag.clear();
-
     if (!_pubs.empty())
         _pubs.clear();
 
     QString loading_msg("Loading " + filename + "...");
-    ROS_INFO_STREAM(loading_msg.toStdString());
+    RCLCPP_INFO_STREAM(_nh->get_logger(), loading_msg.toStdString());
     Q_EMIT sendStatusText(loading_msg);
 
-    if (_bag.isOpen())
-        _bag.close();
-
     try {
-        _bag.open(filename.toStdString(), rosbag::bagmode::Read);
-    } catch (const rosbag::BagIOException& r) {
-        ROS_ERROR_STREAM(r.what());
+        rosbag2_cpp::StorageOptions storage_options;
+        storage_options.uri        = filename.toStdString();
+        storage_options.storage_id = "sqlite3";
+        rosbag2_cpp::ConverterOptions converter_options;
+        converter_options.input_serialization_format  = "cdr";
+        converter_options.output_serialization_format = "cdr";
+
+        _reader.reset();
+        _reader = std::make_shared<rosbag2_cpp::readers::SequentialReader>();
+        _reader->open(storage_options, converter_options);
+    } catch (const std::exception& r) {
+        RCLCPP_ERROR_STREAM(_nh->get_logger(), r.what());
         Q_EMIT sendStatusText(QString::fromStdString(r.what()));
         Q_EMIT sendEnableActionButtons(false);
         return;
     }
 
-    _full_view.reset();
-    _full_view = std::make_unique<rosbag::View>(_bag);
+    auto metadata   = _reader->get_metadata();
+    _full_bag_start = metadata.starting_time.time_since_epoch();
+    _full_bag_end   = _full_bag_start + metadata.duration;
+
     reset();
 
-    for (rosbag::View::iterator iter = _full_view->begin(); iter != _full_view->end(); ++iter) {
-        _reverse_bag.push_back(iter);
-    }
-
-    _full_bag_start = _full_view->getBeginTime();
-    _full_bag_end   = _full_view->getEndTime();
-
-    _last_message_time = ros::Time(0);
+    /// \note: Set to zero initially:
+    _last_message_time = std::chrono::nanoseconds::zero();
     _playback_speed    = 1.0;
 
     Q_EMIT sendBagFinished();
 
-    for (const auto& info : _full_view->getConnections()) {
-        try {
-            ros::AdvertiseOptions opts = createAdvertiseOptions(info, 1, "");
-            ros::Publisher        pub  = _nh.advertise(opts);
-            _pubs[info->topic]         = _nh.advertise(opts);
+    /// \note: Manually set the QoS:
+    rclcpp::QoS qos(rclcpp::KeepLast(10));
+    qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+    qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
 
+    for (const auto& topic : _reader->get_all_topics_and_types()) {
+        try {
+            _pubs[topic.name] = createGenericPublisher(topic.name, topic.type, qos);
         } catch (const std::runtime_error& e) {
-            ROS_ERROR_STREAM(e.what());
+            RCLCPP_ERROR_STREAM(_nh->get_logger(), e.what());
             Q_EMIT sendStatusText(QString::fromStdString(e.what()));
         }
     }
@@ -78,51 +108,54 @@ void QBagPlayer::receiveLoadBag(const QString filename)
     Q_EMIT sendStatusText("");
     Q_EMIT sendEnableActionButtons(true);
 
-    sizeToStr(_bag.getSize());
-    Q_EMIT sendStampLabel(QString::number(_full_view->getBeginTime().toSec(), 'f', 9));
-    Q_EMIT sendDateLabel(QDateTime::fromSecsSinceEpoch(_full_view->getBeginTime().toSec(), Qt::UTC)
-                                 .toString("dd.MM.yyyy hh::mm::ss"));
+    sizeToStr(_reader->get_metadata().bag_size);
+    Q_EMIT sendStampLabel(QString::number(_full_bag_start.count() * 1e-9, 'f', 9));
+    Q_EMIT sendDateLabel(
+            QDateTime::fromSecsSinceEpoch(_full_bag_start.count() * 1e-9, Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
     Q_EMIT sendPlayspeedLabel("x" + QString::number(_playback_speed));
     Q_EMIT sendSecondsLabel(
-            QString::number(_last_message_time.toSec(), 'f', 2) + "/"
-            + QString::number(_full_bag_end.toSec() - _full_bag_start.toSec(), 'f', 2) + "s");
-    Q_EMIT sendPlayheadProgress(_last_message_time.toSec() / (_full_bag_end.toSec() - _full_bag_start.toSec()) * 100);
+            QString::number(_last_message_time.count() * 1e-9, 'f', 2) + "/"
+            + QString::number(_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9, 'f', 2) + "s");
+    Q_EMIT sendPlayheadProgress(
+            _last_message_time.count() * 1e-9 / (_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9) * 100);
 }
 
-void QBagPlayer::receiveSetStart(const ros::Time& start)
+void QBagPlayer::receiveSetStart(const double start)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 
     if (_playback_speed > 0) {
-        _bag_control_start = start;
+        _bag_control_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
 
         if (_playback_direction_changed)
             _bag_control_end = _full_bag_end;
     } else {
-        _bag_control_end = start;
+        _bag_control_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
 
         if (_playback_direction_changed)
             _bag_control_start = _full_bag_start;
     }
 
-    _last_message_time = start;
+    _last_message_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
 }
 
-void QBagPlayer::receiveSetEnd(const ros::Time& end)
+void QBagPlayer::receiveSetEnd(const double end)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 
     if (_playback_speed > 0) {
-        _bag_control_end = end;
+        _bag_control_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
 
         if (_playback_direction_changed)
             _bag_control_start = _full_bag_start;
     } else {
-        _bag_control_start = end;
+        _bag_control_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
 
         if (_playback_direction_changed)
             _bag_control_end = _full_bag_end;
     }
+
+    _last_message_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
 }
 
 void QBagPlayer::receiveChangeSpeed(const float change)
@@ -153,11 +186,11 @@ void QBagPlayer::receiveChangeSpeed(const float change)
     }
 
     if (_playback_direction_changed && !thread_running) {
-        if (_last_message_time == ros::Time(0)) {
+        if (_last_message_time == std::chrono::nanoseconds::zero()) {
             if (change < 0.0)
                 _last_message_time = _full_bag_end;
         }
-        receiveSetStart(_last_message_time);
+        receiveSetStart(_last_message_time.count());
     }
 
     if (thread_running) {
@@ -189,7 +222,7 @@ void QBagPlayer::receiveStartPlaying(void)
     if (!thread_running) {
         _play_thread = std::thread(&QBagPlayer::run, this);
     } else
-        ROS_DEBUG_STREAM("QBagPlayer is already running!");
+        RCLCPP_DEBUG_STREAM(_nh->get_logger(), "QBagPlayer is already running!");
 }
 
 void QBagPlayer::receiveGotoBegin(void)
@@ -208,15 +241,15 @@ void QBagPlayer::receiveGotoBegin(void)
     reset();
     _last_message_time = _full_bag_start;
 
-    Q_EMIT sendStampLabel(QString::number(_full_bag_start.toSec(), 'f', 9));
+    Q_EMIT sendStampLabel(QString::number(_full_bag_start.count() * 1e-9, 'f', 9));
     Q_EMIT sendDateLabel(
-            QDateTime::fromSecsSinceEpoch(_full_bag_start.toSec(), Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
+            QDateTime::fromSecsSinceEpoch(_full_bag_start.count() * 1e-9, Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
 
-    const auto progress = _last_message_time.toSec() - _full_bag_start.toSec();
+    const auto progress = _last_message_time.count() * 1e-9 - _full_bag_start.count() * 1e-9;
     Q_EMIT sendSecondsLabel(
             QString::number(progress, 'f', 2) + "/"
-            + QString::number(_full_bag_end.toSec() - _full_bag_start.toSec(), 'f', 2) + "s");
-    Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.toSec() - _full_bag_start.toSec()) * 100);
+            + QString::number(_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9, 'f', 2) + "s");
+    Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9) * 100);
 }
 
 void QBagPlayer::receiveGotoEnd(void)
@@ -235,15 +268,15 @@ void QBagPlayer::receiveGotoEnd(void)
     reset();
     _last_message_time = _full_bag_end;
 
-    Q_EMIT sendStampLabel(QString::number(_full_bag_end.toSec(), 'f', 9));
+    Q_EMIT sendStampLabel(QString::number(_full_bag_start.count() * 1e-9, 'f', 9));
     Q_EMIT sendDateLabel(
-            QDateTime::fromSecsSinceEpoch(_full_bag_end.toSec(), Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
+            QDateTime::fromSecsSinceEpoch(_full_bag_start.count() * 1e-9, Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
 
-    const auto progress = _last_message_time.toSec() - _full_bag_start.toSec();
+    const auto progress = _last_message_time.count() * 1e-9 - _full_bag_start.count() * 1e-9;
     Q_EMIT sendSecondsLabel(
             QString::number(progress, 'f', 2) + "/"
-            + QString::number(_full_bag_end.toSec() - _full_bag_start.toSec(), 'f', 2) + "s");
-    Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.toSec() - _full_bag_start.toSec()) * 100);
+            + QString::number(_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9, 'f', 2) + "s");
+    Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9) * 100);
 }
 
 void QBagPlayer::receiveClickedProgress(int value)
@@ -258,10 +291,10 @@ void QBagPlayer::receiveClickedProgress(int value)
 
     if (thread_running) {
         receiveSetPause();
-        receiveSetStart(progress_stamp);
+        receiveSetStart(progress_stamp.count());
         receiveStartPlaying();
     } else
-        receiveSetStart(progress_stamp);
+        receiveSetStart(progress_stamp.count());
 }
 
 void QBagPlayer::run(void)
@@ -276,105 +309,57 @@ void QBagPlayer::run(void)
         _thread_running = true;
     }
 
-    rosbag::View view(_bag, _bag_control_start, _bag_control_end);
-
     if (_playback_speed > 0) {
-        _play_start = ros::Time::now();
+        _play_start = std::chrono::system_clock::now();
 
-        for (rosbag::MessageInstance const& m : view) {
-            if (_pubs.find(m.getTopic()) == _pubs.end())
+        while (_reader->has_next()) {
+            const auto& m = _reader->read_next();
+
+            if (_pubs.find(m->topic_name) == _pubs.end())
                 continue;
+
+            if (m->time_stamp < _bag_control_start.count() || m->time_stamp > _bag_control_end.count()) {
+                std::cout << "Timestamp not in range: " << m->time_stamp * 1e-9 << std::endl;
+                continue;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(_pause_mutex);
                 if (_pause) {
-                    _last_message_time = m.getTime();
+                    _last_message_time = std::chrono::nanoseconds(m->time_stamp);
                     break;
                 }
             }
 
-            ros::Time::sleepUntil(real_time(m.getTime()));
+            std::this_thread::sleep_until(realTimeDuration(m->time_stamp));
 
-            _last_message_time = m.getTime();
-            _pubs[m.getTopic()].publish(m);
+            _last_message_time = std::chrono::nanoseconds(m->time_stamp);
+            _pubs[m->topic_name]->publish(m->serialized_data);
 
-            Q_EMIT sendStampLabel(QString::number(_last_message_time.toSec(), 'f', 9));
-            Q_EMIT sendDateLabel(QDateTime::fromSecsSinceEpoch(_last_message_time.toSec(), Qt::UTC)
+            Q_EMIT sendStampLabel(QString::number(_last_message_time.count() * 1e-9, 'f', 9));
+            Q_EMIT sendDateLabel(QDateTime::fromSecsSinceEpoch(_last_message_time.count() * 1e-9, Qt::UTC)
                                          .toString("dd.MM.yyyy hh::mm::ss"));
 
-            const auto progress = _last_message_time.toSec() - _full_bag_start.toSec();
+            const auto progress = _last_message_time.count() * 1e-9 - _full_bag_start.count() * 1e-9;
             Q_EMIT sendSecondsLabel(
                     QString::number(progress, 'f', 2) + "/"
-                    + QString::number(_full_bag_end.toSec() - _full_bag_start.toSec(), 'f', 2) + "s");
-            Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.toSec() - _full_bag_start.toSec()) * 100);
+                    + QString::number(_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9, 'f', 2) + "s");
+            Q_EMIT sendPlayheadProgress(
+                    progress / (_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9) * 100);
         }
-    } else {
-        auto rfound = std::find_if(_reverse_bag.rbegin(), _reverse_bag.rend(), [this](rosbag::View::iterator& it) {
-            return it->getTime() <= _bag_control_end;
-        });
-        if (rfound != _reverse_bag.rend()) {
-            _play_start = ros::Time::now();
-
-            for (auto r_iter = rfound; r_iter != _reverse_bag.rend(); ++r_iter) {
-                const auto& m = *(*r_iter);
-
-                if (_pubs.find(m.getTopic()) == _pubs.end())
-                    continue;
-
-                {
-                    std::lock_guard<std::mutex> lock(_pause_mutex);
-                    if (_pause) {
-                        _last_message_time = m.getTime();
-                        break;
-                    }
-                }
-
-                ros::Time::sleepUntil(real_time(m.getTime()));
-
-                _last_message_time = m.getTime();
-                _pubs[m.getTopic()].publish(m);
-
-                Q_EMIT sendStampLabel(QString::number(_last_message_time.toSec(), 'f', 9));
-                Q_EMIT sendDateLabel(QDateTime::fromSecsSinceEpoch(_last_message_time.toSec(), Qt::UTC)
-                                             .toString("dd.MM.yyyy hh::mm::ss"));
-
-                const auto progress = _last_message_time.toSec() - _full_bag_start.toSec();
-                Q_EMIT sendSecondsLabel(
-                        QString::number(progress, 'f', 2) + "/"
-                        + QString::number(_full_bag_end.toSec() - _full_bag_start.toSec(), 'f', 2) + "s");
-                Q_EMIT sendPlayheadProgress(progress / (_full_bag_end.toSec() - _full_bag_start.toSec()) * 100);
-            }
-        } else
-            ROS_WARN_STREAM("Could not find a suitable reversed time stamped message");
     }
 
     if (!_pause) {
         reset();
         Q_EMIT sendBagFinished();
     } else {
-        receiveSetStart(_last_message_time);
+        receiveSetStart(_last_message_time.count());
     }
 
     {
         std::lock_guard<std::mutex> lock(_thread_mutex);
         _thread_running = false;
     }
-}
-
-ros::AdvertiseOptions QBagPlayer::createAdvertiseOptions(
-        const rosbag::ConnectionInfo* c,
-        uint32_t                      queue_size,
-        const std::string&            prefix)
-{
-    ros::AdvertiseOptions opts(prefix + c->topic, queue_size, c->md5sum, c->datatype, c->msg_def);
-    opts.latch = isLatching(c);
-    return opts;
-}
-
-bool QBagPlayer::isLatching(const rosbag::ConnectionInfo* c)
-{
-    ros::M_string::const_iterator header_iter = c->header->find("latching");
-    return (header_iter != c->header->end() && header_iter->second == "1");
 }
 
 void QBagPlayer::sizeToStr(const uint64_t size)
@@ -393,8 +378,8 @@ void QBagPlayer::sizeToStr(const uint64_t size)
 
 void QBagPlayer::reset(void)
 {
-    _bag_control_start          = _full_view->getBeginTime();
-    _bag_control_end            = _full_view->getEndTime();
+    _bag_control_start          = _full_bag_start;
+    _bag_control_end            = _full_bag_end;
     _playback_direction_changed = false;
 }
 
@@ -408,20 +393,34 @@ void QBagPlayer::resetTxt(void)
     Q_EMIT sendPlayheadProgress(0);
 }
 
-ros::Time QBagPlayer::real_time(const ros::Time& msg_time)
+std::chrono::_V2::system_clock::time_point QBagPlayer::realTimeDuration(const rcutils_time_point_value_t& msg_time)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 
-    if (_playback_speed > 0.0)
-        return _play_start + (msg_time - _bag_control_start) * (1 / _playback_speed);
-    else
-        return _play_start + (_bag_control_end - msg_time) * (1 / std::abs(_playback_speed));
+    if (_playback_speed > 0.0) {
+        return _play_start
+             + std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       (std::chrono::nanoseconds(msg_time) - _bag_control_start) * (1.0 / _playback_speed));
+    } else {
+        return _play_start
+             + std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       (_bag_control_end - std::chrono::nanoseconds(msg_time)) * (1.0 / std::abs(_playback_speed)));
+    }
 }
 
-ros::Time QBagPlayer::getProgressTime(const int progress)
+std::chrono::nanoseconds QBagPlayer::getProgressTime(const int progress)
 {
-    auto      bag_duration = _full_bag_end.toSec() - _full_bag_start.toSec();
-    ros::Time new_start_stamp;
-    return new_start_stamp.fromSec(_full_bag_start.toSec() + bag_duration * progress / 100);
+    auto bag_duration = _full_bag_end - _full_bag_start;
+    return _full_bag_start + bag_duration * progress / 100;
+}
+
+std::shared_ptr<GenericPublisher> QBagPlayer::createGenericPublisher(
+        const std::string& topic,
+        const std::string& type,
+        const rclcpp::QoS& qos)
+{
+    _library_generic_publisher = rosbag2_cpp::get_typesupport_library(type, "rosidl_typesupport_cpp");
+    auto type_support = rosbag2_cpp::get_typesupport_handle(type, "rosidl_typesupport_cpp", _library_generic_publisher);
+    return std::make_shared<GenericPublisher>(_nh->get_node_base_interface().get(), *type_support, topic, qos);
 }
 } // namespace rosbag_rviz_panel

@@ -1,9 +1,10 @@
-#include "rosbag_rviz_panel/BagPlayerWidget.h"
+#include "rosbag_rviz_panel/BagPlayerWidget.hpp"
 
 #include <QFileDialog>
 #include <QIcon>
 #include <QMessageBox>
 #include <QPushButton>
+#include <rclcpp/logger.hpp>
 
 #include "ui_BagPlayerWidget.h"
 
@@ -79,9 +80,9 @@ void BagPlayerWidget::handleLoadClicked(void)
 {
     const QFileInfo filename = QFileDialog::getOpenFileName(
             this,
-            tr("Select the bag to load"),
+            tr("Select the file to load"),
             QDir::homePath(),
-            tr("Bag file (*.bag)"),
+            tr("SQLite3 file (*.db3)"),
             nullptr,
             QFileDialog::DontUseNativeDialog);
 
@@ -108,15 +109,15 @@ void BagPlayerWidget::handleLoadClicked(void)
 
             Q_EMIT sendLoadBag(filename.absoluteFilePath());
 
-        } catch (const rosbag::BagException& e) {
-            ROS_ERROR_STREAM(e.what());
+        } catch (const std::runtime_error& e) {
+            RCLCPP_WARN_STREAM(rclcpp::get_logger("global_logger"), e.what());
 
             receiveStatusText(QString::fromStdString(e.what()));
             receiveEnableActionButtons(false);
         }
     } else {
         std::string msg = "File: '" + filename.absoluteFilePath().toStdString() + "' does not exists!";
-        ROS_WARN_STREAM(msg);
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("global_logger"), msg);
     }
 }
 

@@ -1,4 +1,4 @@
-#include "rosbag_rviz_panel/QCustomProgressBar.h"
+#include "rosbag_rviz_panel/QCustomProgressBar.hpp"
 
 #include <QApplication>
 

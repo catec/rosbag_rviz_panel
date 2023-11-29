@@ -4,8 +4,8 @@
 #include <QThread>
 #include <QWidget>
 
-#include "QBagPlayer.h"
-#include "QCustomProgressBar.h"
+#include "QBagPlayer.hpp"
+#include "QCustomProgressBar.hpp"
 
 namespace Ui {
 class BagPlayerWidget;
@@ -82,7 +82,7 @@ class BagPlayerWidget : public QWidget
      *
      * @param start ros::Time with the desired time stamp.
      */
-    void sendSetStart(const ros::Time& start);
+    void sendSetStart(const double& start);
 
     /**
      * @brief Q_SIGNAL that sends time stamp from where
@@ -90,7 +90,7 @@ class BagPlayerWidget : public QWidget
      *
      * @param end ros::Time with the desired time stamp.
      */
-    void sendSetEnd(const ros::Time& end);
+    void sendSetEnd(const double& end);
 
     /**
      * @brief Q_SIGNAL that increases the playback speed.

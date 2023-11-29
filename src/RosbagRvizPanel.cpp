@@ -1,14 +1,15 @@
-#include "rosbag_rviz_panel/RosbagRvizPanel.h"
+#include "rosbag_rviz_panel/RosbagRvizPanel.hpp"
 
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <rclcpp/logger.hpp>
 
-#include "rosbag_rviz_panel/BagPlayerWidget.h"
+#include "rosbag_rviz_panel/BagPlayerWidget.hpp"
 
 namespace rosbag_rviz_panel {
-RosbagRvizPanel::RosbagRvizPanel(QWidget* parent) : rviz::Panel(parent)
+RosbagRvizPanel::RosbagRvizPanel(QWidget* parent) : rviz_common::Panel(parent)
 {
     _widget = std::make_unique<BagPlayerWidget>();
 
@@ -20,7 +21,7 @@ RosbagRvizPanel::~RosbagRvizPanel() {}
 void RosbagRvizPanel::setupPanelLayout()
 {
     if (!_widget) {
-        ROS_WARN("Widget is null");
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("global_logger"), "Widget is null");
         return;
     }
 
@@ -30,16 +31,16 @@ void RosbagRvizPanel::setupPanelLayout()
     setLayout(layout);
 }
 
-void RosbagRvizPanel::load(const rviz::Config& config)
+void RosbagRvizPanel::load(const rviz_common::Config& config)
 {
-    rviz::Panel::load(config);
+    rviz_common::Panel::load(config);
 }
 
-void RosbagRvizPanel::save(rviz::Config config) const
+void RosbagRvizPanel::save(rviz_common::Config config) const
 {
-    rviz::Panel::save(config);
+    rviz_common::Panel::save(config);
 }
 } // namespace rosbag_rviz_panel
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(rosbag_rviz_panel::RosbagRvizPanel, rviz::Panel)
+#include <pluginlib/class_list_macros.hpp>
+PLUGINLIB_EXPORT_CLASS(rosbag_rviz_panel::RosbagRvizPanel, rviz_common::Panel)

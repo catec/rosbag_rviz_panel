@@ -1,40 +1,21 @@
-# Rosbag RViz Panel
+# Rosbag RViz Panel (ROS2-FOXY)
 
 ## Overview
 
-This package provides a custom RViz panel for playing rosbags with enhanced functionalities. The panel allows users to play rosbags forwards or backwards, adjust play speeds, while also displaying some relevant information such the date of the messages or the total size of the bag. Additionally, it features a custom progress bar that users can interact with.
-
-![Alt Text](docs/rviz_view.gif)
-
-## Features
-
-- **Play Controls:** Play or pause the data at will.
-- **Speed Adjustment:** Change the play speed, from -10x to 10x.
-- **Information Display:**
-  - Timestamp of the current playhead location.
-  - Date and time of the current playhead location.
-  - Number of seconds the current playhead location is from the beginning of the bag.
-  - Playback speed.
-  - Total size of the bag.
-- **Interactive Progress Bar:** Users can interact with the custom progress bar to navigate within the rosbag.
+*This is still an **EARLY VERSION**, so it currently lacks some of the features available in the ros-noetic version of the 'main' branch.*
 
 ## Dependencies installation
 
 ---
 
-### Build essentials and cmake
-```
-sudo apt-get install build-essential cmake
-```
-
-### Qt5
+### Qt5 (By default on Ubuntu 20.04)
 ```
 sudo apt-get install qt5-default
 ```
 
 ### ROS (Robot Operative System)
 
-Follow up your ROS distro installation guide: [Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu) or [Noetic](http://wiki.ros.org/noetic/Installation/Ubuntu)
+Follow up the ROS distro installation guide: [Foxy](https://docs.ros.org/en/foxy/Installation.html)
 
 ### (Optional) Clang-Format 16
 
@@ -48,15 +29,15 @@ sudo apt install clang-format-16
 
 1. Clone this repository into your ROS workspace and compile it using cmake:
     ```
-    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag_rviz_panel
+    mkdir -p your_ros_ws/src && your_ros_ws/src && git clone https://github.com/fada-catec/rosbag_rviz_panel/tree/foxy
 
-    cd .. && catkin_make -DCMAKE_BUILD_TYPE=Release
+    cd .. && colcon build --packages-select rosbag_rviz_panel
     ```
 
 1. Source the workspace and launch RViz:
 
     ```bash
-    source devel/setup.zsh && rviz
+    source install/setup.zsh && rviz2
     ```
 
 2. Add the custom panel to your RViz layout:
@@ -64,7 +45,7 @@ sudo apt install clang-format-16
     - Click on the "Panels" tab in RViz.
     - Select "Add New Panel" and choose it from the list.
 
-3. Load a rosbag using the controls in the custom panel.
+3. Load a compatible rosbag2 file using the controls in the custom panel.
 
 4. Interact with the progress bar to navigate within the rosbag.
 
