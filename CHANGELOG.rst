@@ -2,6 +2,11 @@
 Changelog for package rosbag_rviz_panel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.9 (2023-11-24)
+-------------------
+* Added CHANGELOG.rst
+* Prepare package for release
+
 0.1.8 (2023-11-24)
 -------------------
 * Changes to pass prerelease test
