@@ -4,6 +4,22 @@
 
 *This is still an **EARLY VERSION**, so it currently lacks some of the features available in the ros-noetic version of the 'main' branch.*
 
+This package provides a custom RViz panel for playing rosbags with enhanced functionalities. The panel allows users to play rosbags forwards or backwards, adjust play speeds, while also displaying some relevant information such the date of the messages or the total size of the bag. Additionally, it features a custom progress bar that users can interact with.
+
+![Alt Text](docs/rviz_view.gif)
+
+## Features
+
+- **Play Controls:** Play or pause the data at will.
+- **Speed Adjustment:** Change the play speed, from 0.5x to 10x.
+- **Information Display:**
+  - Timestamp of the current playhead location.
+  - Date and time of the current playhead location.
+  - Number of seconds the current playhead location is from the beginning of the bag.
+  - Playback speed.
+  - Total size of the bag.
+- **Interactive Progress Bar:** Users can interact with the custom progress bar to navigate within the rosbag.
+
 ## Dependencies installation
 
 ---

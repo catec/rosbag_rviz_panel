@@ -26,14 +26,14 @@ class BagPlayerWidget : public QWidget
 
   public:
     /**
-     * @brief Constructor of the QBagPlayer class.
+     * @brief Constructor of the BagPlayerWidget class.
      *
      * @param parent A parent QWidget, if there is one.
      */
     explicit BagPlayerWidget(QWidget* parent = nullptr);
 
     /**
-     * @brief Destructor of the QBagPlayer class.
+     * @brief Destructor of the BagPlayerWidget class.
      */
     virtual ~BagPlayerWidget();
 
@@ -80,17 +80,17 @@ class BagPlayerWidget : public QWidget
      * @brief Q_SIGNAL that sends time stamp from where
      * to start publishing messages.
      *
-     * @param start ros::Time with the desired time stamp.
+     * @param start int64_t with the desired time stamp in nanoseconds.
      */
-    void sendSetStart(const double& start);
+    void sendSetStart(const int64_t start);
 
     /**
      * @brief Q_SIGNAL that sends time stamp from where
      * to stop publishing messages.
      *
-     * @param end ros::Time with the desired time stamp.
+     * @param end int64_t with the desired time stamp in nanoseconds.
      */
-    void sendSetEnd(const double& end);
+    void sendSetEnd(const int64_t end);
 
     /**
      * @brief Q_SIGNAL that increases the playback speed.

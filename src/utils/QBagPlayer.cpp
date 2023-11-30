@@ -41,7 +41,7 @@ namespace rosbag_rviz_panel {
 
 QBagPlayer::QBagPlayer(QObject* parent) : QObject(parent)
 {
-    _nh     = std::make_shared<rclcpp::Node>("QBagPlayer_node");
+    _nh     = std::make_shared<rclcpp::Node>("QBagPlayer");
     _reader = std::make_unique<rosbag2_cpp::readers::SequentialReader>();
 
     _storage_options.storage_id                    = "sqlite3";
@@ -118,42 +118,42 @@ void QBagPlayer::receiveLoadBag(const QString filename)
             _last_message_time.count() * 1e-9 / (_full_bag_end.count() * 1e-9 - _full_bag_start.count() * 1e-9) * 100);
 }
 
-void QBagPlayer::receiveSetStart(const double start)
+void QBagPlayer::receiveSetStart(const int64_t start)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 
     if (_playback_speed > 0) {
-        _bag_control_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
+        _bag_control_start = std::chrono::nanoseconds(start);
 
         if (_playback_direction_changed)
             _bag_control_end = _full_bag_end;
     } else {
-        _bag_control_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
+        _bag_control_end = std::chrono::nanoseconds(start);
 
         if (_playback_direction_changed)
             _bag_control_start = _full_bag_start;
     }
 
-    _last_message_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(start));
+    _last_message_time = std::chrono::nanoseconds(start);
 }
 
-void QBagPlayer::receiveSetEnd(const double end)
+void QBagPlayer::receiveSetEnd(const int64_t end)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 
     if (_playback_speed > 0) {
-        _bag_control_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
+        _bag_control_end = std::chrono::nanoseconds(end);
 
         if (_playback_direction_changed)
             _bag_control_start = _full_bag_start;
     } else {
-        _bag_control_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
+        _bag_control_start = std::chrono::nanoseconds(end);
 
         if (_playback_direction_changed)
             _bag_control_end = _full_bag_end;
     }
 
-    _last_message_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(end));
+    _last_message_time = std::chrono::nanoseconds(end);
 }
 
 void QBagPlayer::receiveChangeSpeed(const float change)
@@ -320,7 +320,7 @@ void QBagPlayer::run(void)
                 continue;
 
             if (m->time_stamp < _bag_control_start.count() || m->time_stamp > _bag_control_end.count()) {
-                std::cout << "Timestamp not in range: " << m->time_stamp * 1e-9 << std::endl;
+                RCLCPP_DEBUG_STREAM(_nh->get_logger(), "Timestamp not in range: " << m->time_stamp * 1e-9);
                 continue;
             }
 
@@ -394,7 +394,7 @@ void QBagPlayer::resetTxt(void)
     Q_EMIT sendPlayheadProgress(0);
 }
 
-std::chrono::_V2::system_clock::time_point QBagPlayer::realTimeDuration(const rcutils_time_point_value_t& msg_time)
+std::chrono::_V2::system_clock::time_point QBagPlayer::realTimeDuration(const int64_t msg_time)
 {
     std::lock_guard<std::mutex> lock(_playback_mutex);
 

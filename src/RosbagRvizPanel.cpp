@@ -21,7 +21,7 @@ RosbagRvizPanel::~RosbagRvizPanel() {}
 void RosbagRvizPanel::setupPanelLayout()
 {
     if (!_widget) {
-        RCLCPP_WARN_STREAM(rclcpp::get_logger("global_logger"), "Widget is null");
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("global_logger"), "Widget is null!");
         return;
     }
 

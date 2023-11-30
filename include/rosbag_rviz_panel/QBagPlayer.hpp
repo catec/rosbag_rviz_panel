@@ -15,6 +15,14 @@
 
 namespace rosbag_rviz_panel {
 
+/**
+ * @brief GenericPublisher.
+ *
+ * This class serves as a flexible rclcpp::Publisher, for
+ * when you don't know what type of message you're
+ * working with at compilation time.
+ *
+ */
 class GenericPublisher : public rclcpp::PublisherBase
 {
   public:
@@ -79,16 +87,16 @@ class QBagPlayer : public QObject
     void resetTxt(void);
 
     /**
-     * @brief Calculate the time stamp to send ROS to sleep
-     * until that stamp has been reached.
+     * @brief Calculate the time since epoch to send the player's
+     * thread to sleep until that time stamp has been reached.
      *
-     * @param msg_time rcutils_time_point_value_t with the
+     * @param msg_time int64_t with the
      *        last proccessed message time stamp.
      *
      * @return std::chrono::_V2::system_clock::time_point
-     *         with the time stam to sleep until.
+     *         with the time stamp to sleep until.
      */
-    std::chrono::_V2::system_clock::time_point realTimeDuration(const rcutils_time_point_value_t& msg_time);
+    std::chrono::_V2::system_clock::time_point realTimeDuration(const int64_t msg_time);
 
     /**
      * @brief Calculate the time stamp to start playing from
@@ -101,6 +109,19 @@ class QBagPlayer : public QObject
      */
     std::chrono::nanoseconds getProgressTime(const int progress);
 
+    /**
+     * @brief Creates a generic ros publisher for when you don't
+     * know the message types during compilation.
+     *
+     * @param topic std::string with the topic's name
+     *
+     * @param type std::string with the message type
+     *
+     * @param qos rclcpp::QoS for the publisher
+     *
+     * @return std::shared_ptr<GenericPublisher> with the
+     *         instantiated publisher.
+     */
     std::shared_ptr<GenericPublisher> createGenericPublisher(
             const std::string& topic,
             const std::string& type,
@@ -187,17 +208,17 @@ class QBagPlayer : public QObject
      * @brief Q_SLOT to set the time stamp for the beginning of
      *        the bag.
      *
-     * @param start rclcpp::Time with the desired time stamp.
+     * @param start int64_t with the desired time stamp in nanoseconds.
      */
-    void receiveSetStart(const double start);
+    void receiveSetStart(const int64_t start);
 
     /**
      * @brief Q_SLOT to set the time stamp for the end of
      *        the bag.
      *
-     * @param end rclcpp::Time with the desired time stamp.
+     * @param end int64_t with the desired time stamp in nanoseconds.
      */
-    void receiveSetEnd(const double end);
+    void receiveSetEnd(const int64_t end);
 
     /**
      * @brief Q_SLOT to change the playback speed.
