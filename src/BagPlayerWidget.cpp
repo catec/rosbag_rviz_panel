@@ -24,6 +24,14 @@ BagPlayerWidget::BagPlayerWidget(QWidget* parent) : QWidget(parent), _ui(std::ma
     _progress_bar->setEnabled(false);
     _ui->horizontalLayout_2->addWidget(_progress_bar.get());
 
+    _player        = std::make_unique<QBagPlayer>();
+    _player_thread = std::make_unique<QThread>(this);
+    _player->moveToThread(_player_thread.get());
+    connect(_player_thread.get(), &QThread::finished, _player.get(), &QBagPlayer::deleteLater, Qt::QueuedConnection);
+    _player_thread->start();
+
+    connectSignals();
+
     QIcon::setThemeName("Yaru");
     _ui->play_button->setIcon(QIcon::fromTheme("media-playback-start"));
     _ui->begin_button->setIcon(QIcon::fromTheme("media-skip-backward"));
@@ -86,27 +94,8 @@ void BagPlayerWidget::handleLoadClicked(void)
             nullptr,
             QFileDialog::DontUseNativeDialog);
 
-    if (filename.exists() && !filename.absoluteFilePath().isEmpty()) {
+    if (filename.exists()) {
         try {
-            if (_player_thread) {
-                _player_thread->quit();
-                _player_thread->wait();
-
-                _player_thread.reset();
-            }
-
-            _player        = std::make_unique<QBagPlayer>();
-            _player_thread = std::make_unique<QThread>(this);
-            _player->moveToThread(_player_thread.get());
-            connect(_player_thread.get(),
-                    &QThread::finished,
-                    _player.get(),
-                    &QBagPlayer::deleteLater,
-                    Qt::QueuedConnection);
-            _player_thread->start();
-
-            connectSignals();
-
             Q_EMIT sendLoadBag(filename.absoluteFilePath());
 
         } catch (const std::runtime_error& e) {

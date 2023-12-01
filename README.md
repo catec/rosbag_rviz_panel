@@ -2,9 +2,7 @@
 
 ## Overview
 
-*This is still an **EARLY VERSION**, so it currently lacks some of the features available in the ros-noetic version of the 'main' branch.*
-
-This package provides a custom RViz panel for playing rosbags with enhanced functionalities. The panel allows users to play rosbags forwards or backwards, adjust play speeds, while also displaying some relevant information such the date of the messages or the total size of the bag. Additionally, it features a custom progress bar that users can interact with.
+This package provides a custom RViz panel for playing rosbags with enhanced functionalities. The panel allows users to play rosbags forwards and adjust play speeds, while also displaying some relevant information such as the date of the messages or the total size of the bag. Additionally, it features a custom progress bar that users can interact with.
 
 ![Alt Text](docs/rviz_view.gif)
 

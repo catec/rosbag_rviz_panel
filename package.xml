@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>rosbag_rviz_panel</name>
-  <version>0.1.2</version>
+  <version>0.1.3</version>
   <description>Play and visualise rosbags in rviz2</description>
   <maintainer email="jmgonzalez@catec.aero">Jose Manuel Gonzalez Marin</maintainer>
   <license>MIT</license>
