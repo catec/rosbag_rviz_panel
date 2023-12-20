@@ -123,6 +123,8 @@ void QBagPlayer::receiveSetEnd(const ros::Time& end)
         if (_playback_direction_changed)
             _bag_control_end = _full_bag_end;
     }
+
+    _last_message_time = end;
 }
 
 void QBagPlayer::receiveChangeSpeed(const float change)
@@ -405,6 +407,7 @@ void QBagPlayer::resetTxt(void)
     Q_EMIT sendPlayspeedLabel("");
     Q_EMIT sendSecondsLabel("");
     Q_EMIT sendStatusText("");
+    Q_EMIT sendBagSize("");
     Q_EMIT sendPlayheadProgress(0);
 }
 

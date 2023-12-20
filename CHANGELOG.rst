@@ -2,6 +2,11 @@
 Changelog for package rosbag_rviz_panel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (2023-12-20)
+-------------------
+* Player thread is no longer created whenever a new bag is loaded
+* Loading a new bag now resets the previous bag size label
+
 0.1.9 (2023-11-24)
 -------------------
 * Added CHANGELOG.rst
