@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -10,6 +11,7 @@
 #include <rosbag2_cpp/converter_options.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <rosbag2_cpp/storage_options.hpp>
+#include <set>
 #include <string>
 #include <thread>
 
@@ -194,6 +196,20 @@ class QBagPlayer : public QObject
      */
     void sendPlayheadProgress(const int progress);
 
+    /**
+     * @brief Q_SIGNAL that sends the list of all topics in the loaded bag.
+     *
+     * @param topics QStringList of topic names.
+     */
+    void sendTopicList(const QStringList topics);
+
+    /**
+     * @brief Q_SIGNAL that sends the list of topics whose type support is missing.
+     *
+     * @param topics QStringList of unsupported topic names.
+     */
+    void sendUnsupportedTopicList(const QStringList topics);
+
   public Q_SLOTS:
     /**
      * @brief Q_SLOT to receive the absolute file path of the selected
@@ -261,6 +277,13 @@ class QBagPlayer : public QObject
      */
     void receiveClickedProgress(int value);
 
+    /**
+     * @brief Q_SLOT to receive the set of selected topics to publish.
+     *
+     * @param topics QStringList of selected topic names.
+     */
+    void receiveSelectedTopics(const QStringList topics);
+
   private:
     std::shared_ptr<rclcpp::Node>                                      _nh;
     std::shared_ptr<rcpputils::SharedLibrary>                          _library_generic_publisher;
@@ -286,6 +309,9 @@ class QBagPlayer : public QObject
     std::mutex _playback_mutex;
     std::mutex _pause_mutex;
     std::mutex _thread_mutex;
+
+    std::set<std::string> _selected_topics;
+    std::mutex            _topics_mutex;
 };
 
 } // namespace rosbag_rviz_panel

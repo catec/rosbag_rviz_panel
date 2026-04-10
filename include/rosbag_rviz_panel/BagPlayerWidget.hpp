@@ -1,7 +1,10 @@
 #pragma once
 
 #include <QList>
+#include <QListWidgetItem>
+#include <QStringList>
 #include <QThread>
+#include <QTimer>
 #include <QWidget>
 
 #include "QBagPlayer.hpp"
@@ -108,6 +111,20 @@ class BagPlayerWidget : public QWidget
      */
     void sendSlower(const float value);
 
+    /**
+     * @brief Q_SIGNAL that sends the set of selected topics to play.
+     *
+     * @param topics QStringList of topics to publish.
+     */
+    void sendSelectedTopics(const QStringList topics);
+
+    /**
+     * @brief Q_SIGNAL that requests a step-play for a given duration.
+     *
+     * @param duration_sec Duration in seconds to play.
+     */
+    void sendStepPlay(const double duration_sec);
+
   private Q_SLOTS:
     /**
      * @brief Q_SLOT that handles actions for when
@@ -195,11 +212,54 @@ class BagPlayerWidget : public QWidget
      */
     void receiveBagFinished(void);
 
+    /**
+     * @brief Q_SLOT that receives the list of topics from the loaded bag.
+     *
+     * @param topics QStringList with topic names.
+     */
+    void receiveTopicList(const QStringList topics);
+
+    /**
+     * @brief Q_SLOT that receives unsupported topics (type support missing).
+     *
+     * @param topics QStringList of unsupported topic names.
+     */
+    void receiveUnsupportedTopicList(const QStringList topics);
+
+    /**
+     * @brief Q_SLOT that handles the Show Topics button click.
+     */
+    void handleShowTopicsClicked(void);
+
+    /**
+     * @brief Q_SLOT that handles the Select All button click.
+     */
+    void handleSelectAllTopicsClicked(void);
+
+    /**
+     * @brief Q_SLOT that handles the Step Play button click.
+     */
+    void handleStepPlayClicked(void);
+
+    /**
+     * @brief Q_SLOT that handles step play timer timeout.
+     */
+    void handleStepPlayTimeout(void);
+
   private:
     std::unique_ptr<Ui::BagPlayerWidget> _ui;
 
     std::unique_ptr<QBagPlayer>         _player;
     std::unique_ptr<QThread>            _player_thread;
     std::unique_ptr<QCustomProgressBar> _progress_bar;
+
+    QTimer* _step_play_timer;
+    bool    _topics_visible{false};
+    bool    _all_topics_selected{true};
+
+    /**
+     * @brief Collects the currently checked topics and emits sendSelectedTopics.
+     */
+    void updateSelectedTopics(void);
 };
 } // namespace rosbag_rviz_panel

@@ -2,8 +2,10 @@
 
 #include <QFileDialog>
 #include <QIcon>
+#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QTimer>
 #include <rclcpp/logger.hpp>
 
 #include "ui_BagPlayerWidget.h"
@@ -44,6 +46,13 @@ BagPlayerWidget::BagPlayerWidget(QWidget* parent) : QWidget(parent), _ui(std::ma
     connect(_ui->slower_button, &QPushButton::clicked, this, &BagPlayerWidget::handleSlowerClicked);
     connect(_ui->faster_button, &QPushButton::clicked, this, &BagPlayerWidget::handleFasterClicked);
     connect(_ui->load_button, &QPushButton::clicked, this, &BagPlayerWidget::handleLoadClicked);
+    connect(_ui->show_topics_button, &QPushButton::clicked, this, &BagPlayerWidget::handleShowTopicsClicked);
+    connect(_ui->select_all_topics_button, &QPushButton::clicked, this, &BagPlayerWidget::handleSelectAllTopicsClicked);
+    connect(_ui->step_play_button, &QPushButton::clicked, this, &BagPlayerWidget::handleStepPlayClicked);
+
+    _step_play_timer = new QTimer(this);
+    _step_play_timer->setSingleShot(true);
+    connect(_step_play_timer, &QTimer::timeout, this, &BagPlayerWidget::handleStepPlayTimeout);
 
     receiveEnableActionButtons(false);
 }
@@ -168,6 +177,9 @@ void BagPlayerWidget::receiveEnableActionButtons(const bool enable)
     }
 
     _progress_bar->setEnabled(enable);
+    _ui->show_topics_button->setEnabled(enable);
+    _ui->select_all_topics_button->setEnabled(enable);
+    _ui->step_play_button->setEnabled(enable);
 }
 
 void BagPlayerWidget::receiveBagFinished(void)
@@ -175,6 +187,89 @@ void BagPlayerWidget::receiveBagFinished(void)
     _ui->play_button->setIcon(QIcon::fromTheme("media-playback-start"));
     if (_ui->play_button->isChecked())
         _ui->play_button->click();
+}
+
+void BagPlayerWidget::receiveTopicList(const QStringList topics)
+{
+    _ui->topic_list_widget->clear();
+    for (const auto& topic : topics) {
+        QListWidgetItem* item = new QListWidgetItem(topic, _ui->topic_list_widget);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(Qt::Checked);
+    }
+    _all_topics_selected = true;
+}
+
+void BagPlayerWidget::receiveUnsupportedTopicList(const QStringList topics)
+{
+    for (int i = 0; i < _ui->topic_list_widget->count(); ++i) {
+        QListWidgetItem* item = _ui->topic_list_widget->item(i);
+        // Extract base topic name (strip any existing suffix)
+        QString base = item->data(Qt::UserRole).toString();
+        if (base.isEmpty())
+            base = item->text();
+        if (topics.contains(base)) {
+            item->setText(base + "  [unsupported]");
+            item->setData(Qt::UserRole, base);  // store original name
+            item->setFlags(item->flags() & ~Qt::ItemIsEnabled);  // gray out
+            item->setCheckState(Qt::Unchecked);
+        }
+    }
+    // Update selected topics after marking unsupported ones
+    updateSelectedTopics();
+}
+
+void BagPlayerWidget::handleShowTopicsClicked(void)
+{
+    _topics_visible = !_topics_visible;
+    _ui->topic_list_widget->setVisible(_topics_visible);
+    _ui->show_topics_button->setText(_topics_visible ? "Hide Topics" : "Show Topics");
+}
+
+void BagPlayerWidget::handleSelectAllTopicsClicked(void)
+{
+    _all_topics_selected = !_all_topics_selected;
+    Qt::CheckState state = _all_topics_selected ? Qt::Checked : Qt::Unchecked;
+    for (int i = 0; i < _ui->topic_list_widget->count(); ++i) {
+        _ui->topic_list_widget->item(i)->setCheckState(state);
+    }
+    _ui->select_all_topics_button->setText(_all_topics_selected ? "Deselect All" : "Select All");
+    updateSelectedTopics();
+}
+
+void BagPlayerWidget::handleStepPlayClicked(void)
+{
+    double duration_sec = _ui->step_duration_spin->value();
+
+    // Start playing
+    if (!_ui->play_button->isChecked())
+        _ui->play_button->click();
+
+    // Set timer to pause after duration
+    _step_play_timer->start(static_cast<int>(duration_sec * 1000));
+}
+
+void BagPlayerWidget::handleStepPlayTimeout(void)
+{
+    // Pause playback
+    if (_ui->play_button->isChecked())
+        _ui->play_button->click();
+}
+
+void BagPlayerWidget::updateSelectedTopics(void)
+{
+    QStringList selected;
+    for (int i = 0; i < _ui->topic_list_widget->count(); ++i) {
+        QListWidgetItem* item = _ui->topic_list_widget->item(i);
+        if (item->checkState() == Qt::Checked) {
+            // Use stored original name if available (unsupported topics store it in UserRole)
+            QString name = item->data(Qt::UserRole).toString();
+            if (name.isEmpty())
+                name = item->text();
+            selected.append(name);
+        }
+    }
+    Q_EMIT sendSelectedTopics(selected);
 }
 
 void BagPlayerWidget::startPlaying(void)
@@ -257,6 +352,27 @@ void BagPlayerWidget::connectSignals(void)
             _progress_bar.get(),
             &QCustomProgressBar::setValue,
             Qt::QueuedConnection);
+
+    connect(_player.get(),
+            &QBagPlayer::sendTopicList,
+            this,
+            &BagPlayerWidget::receiveTopicList,
+            Qt::QueuedConnection);
+    connect(_player.get(),
+            &QBagPlayer::sendUnsupportedTopicList,
+            this,
+            &BagPlayerWidget::receiveUnsupportedTopicList,
+            Qt::QueuedConnection);
+    connect(this,
+            &BagPlayerWidget::sendSelectedTopics,
+            _player.get(),
+            &QBagPlayer::receiveSelectedTopics,
+            Qt::QueuedConnection);
+
+    // When topic checkboxes change, update selected topics
+    connect(_ui->topic_list_widget, &QListWidget::itemChanged, this, [this](QListWidgetItem*) {
+        updateSelectedTopics();
+    });
 }
 
 } // namespace rosbag_rviz_panel
