@@ -94,12 +94,17 @@ void QBagPlayer::receiveLoadBag(const QString filename)
     qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
     qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
 
+    QStringList topic_names;
+    QStringList unsupported_topics;
     for (const auto& topic : _reader->get_all_topics_and_types()) {
+        topic_names.append(QString::fromStdString(topic.name));
         try {
             _pubs[topic.name] = createGenericPublisher(topic.name, topic.type, qos);
         } catch (const std::runtime_error& e) {
-            RCLCPP_ERROR_STREAM(_nh->get_logger(), e.what());
-            Q_EMIT sendStatusText(QString::fromStdString(e.what()));
+            RCLCPP_WARN_STREAM(
+                    _nh->get_logger(),
+                    "Topic '" << topic.name << "' skipped (type support not found): " << e.what());
+            unsupported_topics.append(QString::fromStdString(topic.name));
         }
     }
 
@@ -107,6 +112,21 @@ void QBagPlayer::receiveLoadBag(const QString filename)
     Q_EMIT sendEnableActionButtons(true);
 
     sizeToStr(_reader->get_metadata().bag_size);
+
+    Q_EMIT sendTopicList(topic_names);
+    if (!unsupported_topics.isEmpty())
+        Q_EMIT sendUnsupportedTopicList(unsupported_topics);
+
+    // Initialize selected topics to supported ones only
+    {
+        std::lock_guard<std::mutex> lock(_topics_mutex);
+        _selected_topics.clear();
+        for (const auto& t : topic_names) {
+            if (!unsupported_topics.contains(t))
+                _selected_topics.insert(t.toStdString());
+        }
+    }
+
     Q_EMIT sendStampLabel(QString::number(_full_bag_start.count() * 1e-9, 'f', 9));
     Q_EMIT sendDateLabel(
             QDateTime::fromSecsSinceEpoch(_full_bag_start.count() * 1e-9, Qt::UTC).toString("dd.MM.yyyy hh::mm::ss"));
@@ -319,6 +339,13 @@ void QBagPlayer::run(void)
             if (_pubs.find(m->topic_name) == _pubs.end())
                 continue;
 
+            // Check if topic is in selected set
+            {
+                std::lock_guard<std::mutex> lock(_topics_mutex);
+                if (_selected_topics.find(m->topic_name) == _selected_topics.end())
+                    continue;
+            }
+
             if (m->time_stamp < _bag_control_start.count() || m->time_stamp > _bag_control_end.count()) {
                 RCLCPP_DEBUG_STREAM(_nh->get_logger(), "Timestamp not in range: " << m->time_stamp * 1e-9);
                 continue;
@@ -424,4 +451,13 @@ std::shared_ptr<GenericPublisher> QBagPlayer::createGenericPublisher(
     auto type_support = rosbag2_cpp::get_typesupport_handle(type, "rosidl_typesupport_cpp", _library_generic_publisher);
     return std::make_shared<GenericPublisher>(_nh->get_node_base_interface().get(), *type_support, topic, qos);
 }
+
+void QBagPlayer::receiveSelectedTopics(const QStringList topics)
+{
+    std::lock_guard<std::mutex> lock(_topics_mutex);
+    _selected_topics.clear();
+    for (const auto& t : topics)
+        _selected_topics.insert(t.toStdString());
+}
+
 } // namespace rosbag_rviz_panel
